@@ -1,6 +1,7 @@
 import { Chess } from 'chessops/chess';
 import { parseFen, makeFen, INITIAL_FEN } from 'chessops/fen';
 import { parseSquare, makeSquare, parseUci, makeUci, opposite } from 'chessops/util';
+import { makeSan } from 'chessops/san';
 import type { Square, Move, NormalMove, Color, Role, Piece } from 'chessops/types';
 import type { Key } from '@lichess-org/chessground/types';
 import type { Outcome } from 'chessops/chess';
@@ -83,6 +84,9 @@ export class ChessEngine {
 		const move: NormalMove = { from: fromSq, to: toSq, promotion };
 		if (!this.pos.isLegal(move)) return false;
 
+		// Generate SAN before playing the move
+		const san = makeSan(this.pos, move);
+
 		// Track captures
 		const captured = this.pos.board.get(toSq);
 		if (captured) {
@@ -96,7 +100,7 @@ export class ChessEngine {
 
 		this.pos.play(move);
 		this.lastMoveKeys = [from, to];
-		this.history.push(makeUci(move));
+		this.history.push(san);
 
 		return true;
 	}
@@ -133,6 +137,18 @@ export class ChessEngine {
 		} else {
 			this.pos = Chess.default();
 		}
+	}
+
+	tryMoveUci(uci: string): boolean {
+		const move = parseUci(uci);
+		if (!move) return false;
+
+		if ('from' in move) {
+			const from = makeSquare(move.from) as Key;
+			const to = makeSquare(move.to) as Key;
+			return this.tryMove(from, to, move.promotion);
+		}
+		return false;
 	}
 
 	get turn(): Color {

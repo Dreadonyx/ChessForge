@@ -11,10 +11,22 @@
 	--accent-hover: #651fff;
 }
 
-* {
+*,
+*::before,
+*::after {
 	margin: 0;
 	padding: 0;
 	box-sizing: border-box;
+}
+
+/* Chessground needs content-box on all its elements */
+.cg-wrap,
+.cg-wrap *,
+cg-container,
+cg-board,
+cg-board square,
+cg-board piece {
+	box-sizing: content-box;
 }
 
 body {

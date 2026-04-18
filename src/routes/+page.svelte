@@ -1,19 +1,75 @@
 <script lang="ts">
+	import { onMount, onDestroy } from 'svelte';
+	import { browser } from '$app/environment';
 	import ChessBoard from '$lib/components/ChessBoard.svelte';
 	import GameInfo from '$lib/components/GameInfo.svelte';
 	import ThemeSwitcher from '$lib/components/ThemeSwitcher.svelte';
 	import BoardEditor from '$lib/components/BoardEditor.svelte';
 	import { ChessEngine, type GameMode, type GameState } from '$lib/chess/engine';
+	import { StockfishEngine } from '$lib/chess/stockfish';
 
 	type View = 'play' | 'editor' | 'theme';
+	type Opponent = 'local' | 'ai';
 
 	let view: View = $state('play');
 	let mode: GameMode = $state('standard');
-	let engine = $state(new ChessEngine(mode));
+	let opponent: Opponent = $state('local');
+	let playerColor: 'white' | 'black' = $state('white');
+	let aiDepth = $state(10);
+	let aiThinking = $state(false);
+	let aiReady = $state(false);
+
+	let engine = new ChessEngine(mode);
 	let gameState: GameState = $state(engine.getState());
 	let boardComponent: ChessBoard | undefined = $state();
 	let showPromotion = $state(false);
 	let pendingPromotion: { from: string; to: string } | null = $state(null);
+
+	let stockfish: StockfishEngine | null = null;
+
+	const skillPresets = [
+		{ label: 'Beginner', depth: 3, skill: 1 },
+		{ label: 'Easy', depth: 5, skill: 5 },
+		{ label: 'Medium', depth: 8, skill: 10 },
+		{ label: 'Hard', depth: 12, skill: 15 },
+		{ label: 'Max', depth: 16, skill: 20 }
+	];
+	let selectedPreset = $state(2); // Medium
+
+	onMount(async () => {
+		stockfish = new StockfishEngine();
+		try {
+			await stockfish.init();
+			stockfish.setSkillLevel(skillPresets[selectedPreset].skill);
+			aiReady = true;
+		} catch (err) {
+			console.error('Failed to init Stockfish:', err);
+		}
+	});
+
+	onDestroy(() => {
+		stockfish?.destroy();
+	});
+
+	async function makeAiMove() {
+		if (!stockfish || !aiReady) return;
+
+		// Read current state from engine directly to avoid stale reactive state
+		const currentState = engine.getState();
+		if (currentState.isEnd) return;
+		if (currentState.turnColor === playerColor) return;
+
+		aiThinking = true;
+		const preset = skillPresets[selectedPreset];
+		const currentFen = currentState.fen;
+		const bestMoveUci = await stockfish.getBestMove(currentFen, preset.depth);
+		aiThinking = false;
+
+		if (bestMoveUci) {
+			engine.tryMoveUci(bestMoveUci);
+			gameState = engine.getState();
+		}
+	}
 
 	function handleMove(from: string, to: string) {
 		const piece = getPieceAt(from);
@@ -28,6 +84,10 @@
 		const success = engine.tryMove(from, to);
 		if (success) {
 			gameState = engine.getState();
+			if (opponent === 'ai' && !gameState.isEnd) {
+				// Small delay to let the board update before AI thinks
+				setTimeout(() => makeAiMove(), 100);
+			}
 		}
 	}
 
@@ -60,6 +120,9 @@
 			gameState = engine.getState();
 			pendingPromotion = null;
 			showPromotion = false;
+			if (opponent === 'ai' && !gameState.isEnd) {
+				setTimeout(() => makeAiMove(), 100);
+			}
 		}
 	}
 
@@ -67,6 +130,28 @@
 		if (newMode !== undefined) mode = newMode;
 		engine.reset(mode);
 		gameState = engine.getState();
+		stockfish?.newGame();
+
+		// If AI plays white, make its move
+		if (opponent === 'ai' && playerColor === 'black') {
+			makeAiMove();
+		}
+	}
+
+	function setOpponent(op: Opponent) {
+		opponent = op;
+		newGame();
+	}
+
+	function setDifficulty(index: number) {
+		selectedPreset = index;
+		const preset = skillPresets[index];
+		stockfish?.setSkillLevel(preset.skill);
+	}
+
+	function togglePlayerColor() {
+		playerColor = playerColor === 'white' ? 'black' : 'white';
+		newGame();
 	}
 
 	function flipBoard() {
@@ -75,9 +160,14 @@
 
 	function startFromEditor(fen: string) {
 		mode = 'standard';
-		engine = new ChessEngine('standard', fen);
+		engine.reset('standard', fen);
 		gameState = engine.getState();
+		stockfish?.newGame();
 		view = 'play';
+
+		if (opponent === 'ai' && gameState.turnColor !== playerColor) {
+			makeAiMove();
+		}
 	}
 
 	const promotionPieces = [
@@ -106,21 +196,57 @@
 						Chess960
 					</button>
 				</div>
+
+				<div class="opponent-select">
+					<button class:active={opponent === 'local'} class="secondary" onclick={() => setOpponent('local')}>
+						Local
+					</button>
+					<button class:active={opponent === 'ai'} class="secondary" onclick={() => setOpponent('ai')}>
+						vs AI {#if !aiReady}(loading...){/if}
+					</button>
+				</div>
+
 				<div class="actions">
 					<button class="secondary" onclick={() => newGame()}>New Game</button>
-					<button class="secondary" onclick={flipBoard}>Flip Board</button>
+					<button class="secondary" onclick={flipBoard}>Flip</button>
+					{#if opponent === 'ai'}
+						<button class="secondary" onclick={togglePlayerColor}>
+							Play as {playerColor === 'white' ? 'Black' : 'White'}
+						</button>
+					{/if}
 				</div>
 			</div>
 
+			{#if opponent === 'ai'}
+				<div class="ai-controls">
+					<span class="ai-label">Difficulty:</span>
+					{#each skillPresets as preset, i}
+						<button
+							class="difficulty-btn"
+							class:active={selectedPreset === i}
+							onclick={() => setDifficulty(i)}
+						>
+							{preset.label}
+						</button>
+					{/each}
+				</div>
+			{/if}
+
 			<div class="play-area">
 				<div class="board-area">
+					{#if aiThinking}
+						<div class="thinking-bar">AI is thinking...</div>
+					{/if}
+
 					<ChessBoard
 						bind:this={boardComponent}
 						fen={gameState.fen}
 						turnColor={gameState.turnColor}
-						dests={gameState.dests}
+						dests={opponent === 'ai' && gameState.turnColor !== playerColor ? new Map() : gameState.dests}
 						lastMove={gameState.lastMove}
 						isCheck={gameState.isCheck}
+						orientation={opponent === 'ai' ? playerColor : 'white'}
+						viewOnly={aiThinking}
 						onMove={handleMove}
 					/>
 
@@ -191,21 +317,58 @@
 		display: flex;
 		flex-direction: column;
 		align-items: center;
-		gap: 1.5rem;
+		gap: 1rem;
 		width: 100%;
 	}
 
 	.controls {
 		display: flex;
-		gap: 1rem;
+		gap: 0.75rem;
 		flex-wrap: wrap;
 		justify-content: center;
 	}
 
 	.mode-select,
+	.opponent-select,
 	.actions {
 		display: flex;
-		gap: 0.5rem;
+		gap: 0.4rem;
+	}
+
+	.ai-controls {
+		display: flex;
+		align-items: center;
+		gap: 0.4rem;
+		flex-wrap: wrap;
+		justify-content: center;
+	}
+
+	.ai-label {
+		font-size: 0.85rem;
+		color: #888;
+		margin-right: 0.25rem;
+	}
+
+	.difficulty-btn {
+		padding: 0.35rem 0.8rem;
+		font-size: 0.8rem;
+		background: #1e1e1e;
+		color: #aaa;
+		border-radius: 6px;
+		border: 1px solid transparent;
+		cursor: pointer;
+		transition: all 0.15s;
+	}
+
+	.difficulty-btn:hover {
+		border-color: #555;
+		color: #ddd;
+	}
+
+	.difficulty-btn.active {
+		background: var(--accent);
+		color: white;
+		border-color: var(--accent);
 	}
 
 	.play-area {
@@ -217,6 +380,25 @@
 
 	.board-area {
 		position: relative;
+	}
+
+	.thinking-bar {
+		position: absolute;
+		top: -2rem;
+		left: 0;
+		right: 0;
+		text-align: center;
+		font-size: 0.85rem;
+		color: #aaa;
+		padding: 0.3rem;
+		background: #1e1e1e;
+		border-radius: 6px;
+		animation: pulse 1.5s ease-in-out infinite;
+	}
+
+	@keyframes pulse {
+		0%, 100% { opacity: 0.6; }
+		50% { opacity: 1; }
 	}
 
 	.promotion-overlay {

@@ -33,6 +33,7 @@
 	onMount(() => {
 		ground = Chessground(boardEl, {
 			fen: '8/8/8/8/8/8/8/8',
+			coordinates: true,
 			movable: { free: true, color: 'both' },
 			draggable: { enabled: true },
 			animation: { enabled: false },
@@ -53,6 +54,10 @@
 					}
 				}
 			}
+		});
+
+		requestAnimationFrame(() => {
+			ground?.redrawAll();
 		});
 	});
 
@@ -201,9 +206,7 @@
 </script>
 
 <div class="editor-container">
-	<div class="editor-board-wrap">
-		<div class="editor-board" bind:this={boardEl}></div>
-	</div>
+	<div class="editor-board" bind:this={boardEl}></div>
 
 	<div class="editor-panel">
 		<h3>Board Editor</h3>
@@ -281,14 +284,11 @@
 		gap: 1.5rem;
 	}
 
-	.editor-board-wrap {
-		width: min(90vw, 560px);
-		aspect-ratio: 1;
-	}
-
 	.editor-board {
-		width: 100%;
-		height: 100%;
+		width: min(90vw, 560px);
+		height: min(90vw, 560px);
+		position: relative;
+		display: block;
 	}
 
 	.editor-panel {

@@ -2,8 +2,7 @@
 	import { onMount, onDestroy } from 'svelte';
 	import { Chessground } from '@lichess-org/chessground';
 	import type { Api } from '@lichess-org/chessground/api';
-	import type { Key, Color as CgColor, Piece as CgPiece } from '@lichess-org/chessground/types';
-	import type { Role } from 'chessops/types';
+	import type { Key, Color as CgColor } from '@lichess-org/chessground/types';
 
 	interface Props {
 		fen: string;
@@ -28,7 +27,7 @@
 	}: Props = $props();
 
 	let boardEl: HTMLDivElement;
-	let ground: Api | undefined;
+	let ground: Api | undefined = $state(undefined);
 
 	onMount(() => {
 		ground = Chessground(boardEl, {
@@ -37,6 +36,7 @@
 			turnColor: turnColor as CgColor,
 			check: isCheck ? turnColor as CgColor : false,
 			lastMove: lastMove as Key[] | undefined,
+			coordinates: true,
 			movable: {
 				free: false,
 				color: viewOnly ? undefined : turnColor as CgColor,
@@ -53,20 +53,31 @@
 				}
 			}
 		});
+
+		// Redraw after a frame to ensure correct dimensions
+		requestAnimationFrame(() => {
+			ground?.redrawAll();
+		});
 	});
 
 	$effect(() => {
 		if (!ground) return;
-		ground.set({
+
+		const cfg: Parameters<Api['set']>[0] = {
 			fen,
+			orientation,
 			turnColor: turnColor as CgColor,
 			check: isCheck ? turnColor as CgColor : false,
 			lastMove: lastMove as Key[] | undefined,
 			movable: {
+				free: false,
 				color: viewOnly ? undefined : turnColor as CgColor,
-				dests
+				dests,
+				showDests: true
 			}
-		});
+		};
+
+		ground.set(cfg);
 	});
 
 	onDestroy(() => {
@@ -78,17 +89,13 @@
 	}
 </script>
 
-<div class="board-wrap">
-	<div class="board" bind:this={boardEl}></div>
-</div>
+<div class="board-container" bind:this={boardEl}></div>
 
 <style>
-	.board-wrap {
+	.board-container {
 		width: min(90vw, 560px);
-		aspect-ratio: 1;
-	}
-	.board {
-		width: 100%;
-		height: 100%;
+		height: min(90vw, 560px);
+		display: block;
+		position: relative;
 	}
 </style>
