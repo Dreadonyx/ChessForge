@@ -28,6 +28,7 @@ export class ChessEngine {
 	private captured: { white: Role[]; black: Role[] } = { white: [], black: [] };
 	private lastMoveKeys: [Key, Key] | undefined;
 	private mode: GameMode;
+	private posHistory: { pos: Chess; lastMove: [Key, Key] | undefined; captured: { white: Role[]; black: Role[] } }[] = [];
 
 	constructor(mode: GameMode = 'standard', fen?: string) {
 		this.mode = mode;
@@ -83,6 +84,13 @@ export class ChessEngine {
 		const move: NormalMove = { from: fromSq, to: toSq, promotion };
 		if (!this.pos.isLegal(move)) return false;
 
+		// Save state for undo
+		this.posHistory.push({
+			pos: this.pos.clone(),
+			lastMove: this.lastMoveKeys,
+			captured: { white: [...this.captured.white], black: [...this.captured.black] }
+		});
+
 		// Generate SAN before playing the move
 		const san = makeSan(this.pos, move);
 
@@ -125,6 +133,7 @@ export class ChessEngine {
 		this.history = [];
 		this.captured = { white: [], black: [] };
 		this.lastMoveKeys = undefined;
+		this.posHistory = [];
 
 		if (fen) {
 			const setup = parseFen(fen).unwrap();
@@ -152,6 +161,20 @@ export class ChessEngine {
 
 	get turn(): Color {
 		return this.pos.turn;
+	}
+
+	undo(): boolean {
+		const prev = this.posHistory.pop();
+		if (!prev) return false;
+		this.pos = prev.pos;
+		this.lastMoveKeys = prev.lastMove;
+		this.captured = prev.captured;
+		this.history.pop();
+		return true;
+	}
+
+	get canUndo(): boolean {
+		return this.posHistory.length > 0;
 	}
 
 	get fen(): string {

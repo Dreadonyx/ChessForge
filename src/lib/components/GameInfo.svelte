@@ -3,9 +3,11 @@
 
 	interface Props {
 		state: GameState;
+		resigned?: boolean;
+		resignedColor?: 'white' | 'black';
 	}
 
-	let { state }: Props = $props();
+	let { state, resigned = false, resignedColor = 'white' }: Props = $props();
 
 	const pieceSymbols: Record<string, string> = {
 		king: '♚',
@@ -21,6 +23,10 @@
 	}
 
 	function statusText(state: GameState): string {
+		if (resigned) {
+			const winner = resignedColor === 'white' ? 'Black' : 'White';
+			return `${capitalize(resignedColor)} resigned — ${winner} wins`;
+		}
 		if (state.isCheckmate) {
 			const winner = state.turnColor === 'white' ? 'Black' : 'White';
 			return `Checkmate! ${winner} wins`;
@@ -37,7 +43,7 @@
 </script>
 
 <div class="game-info">
-	<div class="status" class:check={state.isCheck} class:end={state.isEnd}>
+	<div class="status" class:check={state.isCheck} class:end={state.isEnd || resigned}>
 		{statusText(state)}
 	</div>
 

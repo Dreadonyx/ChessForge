@@ -64,12 +64,11 @@
 		const preset = skillPresets[selectedPreset];
 		const currentFen = currentState.fen;
 		const bestMoveUci = await stockfish.getBestMove(currentFen, preset.depth);
-		aiThinking = false;
-
 		if (bestMoveUci) {
 			engine.tryMoveUci(bestMoveUci);
 			gameState = engine.getState();
 		}
+		aiThinking = false;
 	}
 
 	function handleMove(from: string, to: string) {
@@ -129,6 +128,7 @@
 
 	function newGame(newMode?: GameMode) {
 		if (newMode !== undefined) mode = newMode;
+		resigned = false;
 		engine.reset(mode);
 		gameState = engine.getState();
 		stockfish?.newGame();
@@ -157,6 +157,25 @@
 
 	function flipBoard() {
 		boardComponent?.toggleOrientation();
+	}
+
+	let resigned = $state(false);
+
+	function resign() {
+		if (gameState.isEnd || resigned) return;
+		resigned = true;
+	}
+
+	function takeBack() {
+		if (aiThinking || resigned) return;
+		if (opponent === 'ai') {
+			// Undo both AI move and player move
+			engine.undo();
+			engine.undo();
+		} else {
+			engine.undo();
+		}
+		gameState = engine.getState();
 	}
 
 	function startFromEditor(fen: string) {
@@ -210,6 +229,12 @@
 				<div class="actions">
 					<button class="secondary" onclick={() => newGame()}>New Game</button>
 					<button class="secondary" onclick={flipBoard}>Flip</button>
+					<button class="secondary" onclick={takeBack} disabled={!engine.canUndo || aiThinking || resigned || gameState.isEnd}>
+						Take Back
+					</button>
+					<button class="secondary resign-btn" onclick={resign} disabled={gameState.isEnd || resigned || aiThinking}>
+						Resign
+					</button>
 					{#if opponent === 'ai'}
 						<button class="secondary" onclick={togglePlayerColor}>
 							Play as {playerColor === 'white' ? 'Black' : 'White'}
@@ -247,7 +272,7 @@
 						lastMove={gameState.lastMove}
 						isCheck={gameState.isCheck}
 						orientation={opponent === 'ai' ? playerColor : 'white'}
-						viewOnly={aiThinking}
+						viewOnly={aiThinking || resigned}
 						onMove={handleMove}
 					/>
 
@@ -267,7 +292,7 @@
 					{/if}
 				</div>
 
-				<GameInfo state={gameState} />
+				<GameInfo state={gameState} {resigned} resignedColor={opponent === 'ai' ? playerColor : gameState.turnColor} />
 			</div>
 		</div>
 	{:else if view === 'editor'}
@@ -395,6 +420,16 @@
 		background: #1e1e1e;
 		border-radius: 6px;
 		animation: pulse 1.5s ease-in-out infinite;
+	}
+
+	.resign-btn:not(:disabled):hover {
+		background: #c62828 !important;
+		color: white;
+	}
+
+	button:disabled {
+		opacity: 0.4;
+		cursor: not-allowed;
 	}
 
 	@keyframes pulse {

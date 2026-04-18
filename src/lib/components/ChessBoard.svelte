@@ -26,9 +26,16 @@
 		onMove
 	}: Props = $props();
 
+	let containerEl: HTMLDivElement;
 	let boardEl: HTMLDivElement;
 	let ground: Api | undefined = $state(undefined);
 	let prevFen = '';
+	let resizeObserver: ResizeObserver | undefined;
+
+	function recalcBounds() {
+		ground?.redrawAll();
+		document.body.dispatchEvent(new Event('chessground.resize'));
+	}
 
 	onMount(() => {
 		ground = Chessground(boardEl, {
@@ -57,9 +64,16 @@
 		});
 		prevFen = fen;
 
-		requestAnimationFrame(() => {
-			ground?.redrawAll();
+		// ResizeObserver recalculates bounds whenever board size changes
+		resizeObserver = new ResizeObserver(() => {
+			recalcBounds();
 		});
+		resizeObserver.observe(containerEl);
+
+		// Also recalc after delays to catch late layout shifts
+		setTimeout(recalcBounds, 50);
+		setTimeout(recalcBounds, 200);
+		setTimeout(recalcBounds, 500);
 	});
 
 	$effect(() => {
@@ -94,9 +108,14 @@
 		}
 
 		ground.set(config);
+
+		if (fenChanged) {
+			requestAnimationFrame(recalcBounds);
+		}
 	});
 
 	onDestroy(() => {
+		resizeObserver?.disconnect();
 		ground?.destroy();
 	});
 
@@ -105,14 +124,13 @@
 	}
 </script>
 
-<div class="board-container">
+<div class="board-container" bind:this={containerEl}>
 	<div class="board" bind:this={boardEl}></div>
 </div>
 
 <style>
 	.board-container {
-		width: 100%;
-		max-width: 560px;
+		width: min(90vw, 560px);
 		aspect-ratio: 1;
 		position: relative;
 	}

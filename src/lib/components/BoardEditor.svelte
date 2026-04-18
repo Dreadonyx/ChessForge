@@ -287,8 +287,7 @@
 	}
 
 	.editor-board {
-		width: 100%;
-		max-width: 560px;
+		width: min(90vw, 560px);
 		aspect-ratio: 1;
 		position: relative;
 	}
