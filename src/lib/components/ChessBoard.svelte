@@ -30,19 +30,7 @@
 	let ground: Api | undefined = $state(undefined);
 	let prevFen = '';
 
-	let resizeHandler: (() => void) | undefined;
-
 	onMount(() => {
-		const setPixelPerfectSize = () => {
-			const maxSize = Math.min(window.innerWidth * 0.9, 560);
-			const size = Math.floor(maxSize / 8) * 8;
-			boardEl.style.width = size + 'px';
-			boardEl.style.height = size + 'px';
-		};
-		setPixelPerfectSize();
-		resizeHandler = setPixelPerfectSize;
-		window.addEventListener('resize', setPixelPerfectSize);
-
 		ground = Chessground(boardEl, {
 			fen,
 			orientation,
@@ -62,8 +50,6 @@
 			premovable: { enabled: false },
 			events: {
 				move: (orig: Key, dest: Key) => {
-					// After user move, chessground already moved the piece visually.
-					// Store current fen so we can skip the redundant fen update in $effect.
 					prevFen = '';
 					onMove?.(orig, dest);
 				}
@@ -79,7 +65,6 @@
 	$effect(() => {
 		if (!ground) return;
 
-		// Read all props to track them
 		const newFen = fen;
 		const newTurn = turnColor as CgColor;
 		const newCheck = isCheck;
@@ -88,8 +73,6 @@
 		const newViewOnly = viewOnly;
 		const newOrientation = orientation;
 
-		// Only set fen if it actually changed from an external source (AI move, new game)
-		// Skip if it changed because of the user's own move (chessground already handled it)
 		const fenChanged = newFen !== prevFen;
 		prevFen = newFen;
 
@@ -114,7 +97,6 @@
 	});
 
 	onDestroy(() => {
-		if (resizeHandler) window.removeEventListener('resize', resizeHandler);
 		ground?.destroy();
 	});
 
@@ -123,15 +105,22 @@
 	}
 </script>
 
-<div class="board-container" bind:this={boardEl}></div>
+<div class="board-container">
+	<div class="board" bind:this={boardEl}></div>
+</div>
 
 <style>
 	.board-container {
-		width: 560px;
-		height: 560px;
-		max-width: 90vw;
-		max-height: 90vw;
-		display: block;
+		width: 100%;
+		max-width: 560px;
+		aspect-ratio: 1;
 		position: relative;
+	}
+	.board {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
 	}
 </style>

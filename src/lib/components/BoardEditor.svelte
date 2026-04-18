@@ -30,19 +30,7 @@
 		{ role: 'pawn', symbol: '♟' }
 	];
 
-	let resizeHandler: (() => void) | undefined;
-
 	onMount(() => {
-		const setPixelPerfectSize = () => {
-			const maxSize = Math.min(window.innerWidth * 0.9, 560);
-			const size = Math.floor(maxSize / 8) * 8;
-			boardEl.style.width = size + 'px';
-			boardEl.style.height = size + 'px';
-		};
-		setPixelPerfectSize();
-		resizeHandler = setPixelPerfectSize;
-		window.addEventListener('resize', setPixelPerfectSize);
-
 		ground = Chessground(boardEl, {
 			fen: '8/8/8/8/8/8/8/8',
 			coordinates: true,
@@ -74,7 +62,6 @@
 	});
 
 	onDestroy(() => {
-		if (resizeHandler) window.removeEventListener('resize', resizeHandler);
 		ground?.destroy();
 	});
 
@@ -219,7 +206,9 @@
 </script>
 
 <div class="editor-container">
-	<div class="editor-board" bind:this={boardEl}></div>
+	<div class="editor-board">
+		<div class="board" bind:this={boardEl}></div>
+	</div>
 
 	<div class="editor-panel">
 		<h3>Board Editor</h3>
@@ -298,12 +287,17 @@
 	}
 
 	.editor-board {
-		width: 560px;
-		height: 560px;
-		max-width: 90vw;
-		max-height: 90vw;
+		width: 100%;
+		max-width: 560px;
+		aspect-ratio: 1;
 		position: relative;
-		display: block;
+	}
+	.board {
+		position: absolute;
+		top: 0;
+		left: 0;
+		width: 100%;
+		height: 100%;
 	}
 
 	.editor-panel {
