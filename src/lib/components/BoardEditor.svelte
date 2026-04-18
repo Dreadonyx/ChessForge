@@ -30,7 +30,19 @@
 		{ role: 'pawn', symbol: '♟' }
 	];
 
+	let resizeHandler: (() => void) | undefined;
+
 	onMount(() => {
+		const setPixelPerfectSize = () => {
+			const maxSize = Math.min(window.innerWidth * 0.9, 560);
+			const size = Math.floor(maxSize / 8) * 8;
+			boardEl.style.width = size + 'px';
+			boardEl.style.height = size + 'px';
+		};
+		setPixelPerfectSize();
+		resizeHandler = setPixelPerfectSize;
+		window.addEventListener('resize', setPixelPerfectSize);
+
 		ground = Chessground(boardEl, {
 			fen: '8/8/8/8/8/8/8/8',
 			coordinates: true,
@@ -62,6 +74,7 @@
 	});
 
 	onDestroy(() => {
+		if (resizeHandler) window.removeEventListener('resize', resizeHandler);
 		ground?.destroy();
 	});
 
@@ -285,8 +298,10 @@
 	}
 
 	.editor-board {
-		width: min(90vw, 560px);
-		height: min(90vw, 560px);
+		width: 560px;
+		height: 560px;
+		max-width: 90vw;
+		max-height: 90vw;
 		position: relative;
 		display: block;
 	}

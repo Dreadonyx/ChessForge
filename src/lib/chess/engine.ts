@@ -2,9 +2,8 @@ import { Chess } from 'chessops/chess';
 import { parseFen, makeFen, INITIAL_FEN } from 'chessops/fen';
 import { parseSquare, makeSquare, parseUci, makeUci, opposite } from 'chessops/util';
 import { makeSan } from 'chessops/san';
-import type { Square, Move, NormalMove, Color, Role, Piece } from 'chessops/types';
+import type { Square, Move, NormalMove, Color, Role, Piece, Outcome } from 'chessops/types';
 import type { Key } from '@lichess-org/chessground/types';
-import type { Outcome } from 'chessops/chess';
 
 export type GameMode = 'standard' | 'chess960';
 

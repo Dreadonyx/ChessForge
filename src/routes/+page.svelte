@@ -7,6 +7,7 @@
 	import BoardEditor from '$lib/components/BoardEditor.svelte';
 	import { ChessEngine, type GameMode, type GameState } from '$lib/chess/engine';
 	import { StockfishEngine } from '$lib/chess/stockfish';
+	import type { Key } from '@lichess-org/chessground/types';
 
 	type View = 'play' | 'editor' | 'theme';
 	type Opponent = 'local' | 'ai';
@@ -81,7 +82,7 @@
 			return;
 		}
 
-		const success = engine.tryMove(from, to);
+		const success = engine.tryMove(from as Key, to as Key);
 		if (success) {
 			gameState = engine.getState();
 			if (opponent === 'ai' && !gameState.isEnd) {
@@ -116,7 +117,7 @@
 
 	function promote(role: 'queen' | 'rook' | 'bishop' | 'knight') {
 		if (pendingPromotion) {
-			engine.tryMove(pendingPromotion.from, pendingPromotion.to, role);
+			engine.tryMove(pendingPromotion.from as Key, pendingPromotion.to as Key, role);
 			gameState = engine.getState();
 			pendingPromotion = null;
 			showPromotion = false;

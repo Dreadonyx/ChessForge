@@ -28,8 +28,21 @@
 
 	let boardEl: HTMLDivElement;
 	let ground: Api | undefined = $state(undefined);
+	let prevFen = '';
+
+	let resizeHandler: (() => void) | undefined;
 
 	onMount(() => {
+		const setPixelPerfectSize = () => {
+			const maxSize = Math.min(window.innerWidth * 0.9, 560);
+			const size = Math.floor(maxSize / 8) * 8;
+			boardEl.style.width = size + 'px';
+			boardEl.style.height = size + 'px';
+		};
+		setPixelPerfectSize();
+		resizeHandler = setPixelPerfectSize;
+		window.addEventListener('resize', setPixelPerfectSize);
+
 		ground = Chessground(boardEl, {
 			fen,
 			orientation,
@@ -49,12 +62,15 @@
 			premovable: { enabled: false },
 			events: {
 				move: (orig: Key, dest: Key) => {
+					// After user move, chessground already moved the piece visually.
+					// Store current fen so we can skip the redundant fen update in $effect.
+					prevFen = '';
 					onMove?.(orig, dest);
 				}
 			}
 		});
+		prevFen = fen;
 
-		// Redraw after a frame to ensure correct dimensions
 		requestAnimationFrame(() => {
 			ground?.redrawAll();
 		});
@@ -63,24 +79,42 @@
 	$effect(() => {
 		if (!ground) return;
 
-		const cfg: Parameters<Api['set']>[0] = {
-			fen,
-			orientation,
-			turnColor: turnColor as CgColor,
-			check: isCheck ? turnColor as CgColor : false,
-			lastMove: lastMove as Key[] | undefined,
+		// Read all props to track them
+		const newFen = fen;
+		const newTurn = turnColor as CgColor;
+		const newCheck = isCheck;
+		const newLastMove = lastMove;
+		const newDests = dests;
+		const newViewOnly = viewOnly;
+		const newOrientation = orientation;
+
+		// Only set fen if it actually changed from an external source (AI move, new game)
+		// Skip if it changed because of the user's own move (chessground already handled it)
+		const fenChanged = newFen !== prevFen;
+		prevFen = newFen;
+
+		const config: any = {
+			orientation: newOrientation,
+			turnColor: newTurn,
+			check: newCheck ? newTurn : false,
+			lastMove: newLastMove as Key[] | undefined,
 			movable: {
 				free: false,
-				color: viewOnly ? undefined : turnColor as CgColor,
-				dests,
+				color: newViewOnly ? undefined : newTurn,
+				dests: newDests,
 				showDests: true
 			}
 		};
 
-		ground.set(cfg);
+		if (fenChanged) {
+			config.fen = newFen;
+		}
+
+		ground.set(config);
 	});
 
 	onDestroy(() => {
+		if (resizeHandler) window.removeEventListener('resize', resizeHandler);
 		ground?.destroy();
 	});
 
@@ -93,8 +127,10 @@
 
 <style>
 	.board-container {
-		width: min(90vw, 560px);
-		height: min(90vw, 560px);
+		width: 560px;
+		height: 560px;
+		max-width: 90vw;
+		max-height: 90vw;
 		display: block;
 		position: relative;
 	}

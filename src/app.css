@@ -19,14 +19,16 @@
 	box-sizing: border-box;
 }
 
-/* Chessground needs content-box on all its elements */
+/* Chessground requires content-box on ALL its elements — !important to override * reset */
 .cg-wrap,
 .cg-wrap *,
 cg-container,
+cg-container *,
 cg-board,
-cg-board square,
-cg-board piece {
-	box-sizing: content-box;
+cg-board * {
+	box-sizing: content-box !important;
+	padding: 0 !important;
+	border: none !important;
 }
 
 body {
